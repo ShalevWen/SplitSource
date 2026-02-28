@@ -1,0 +1,20 @@
+body {
+  margin: 0;
+  height: 100vh;
+  background: black;
+}
+
+#root {
+  margin: 0;
+  padding: 0.75rem;
+  font-size: 0.7rem;
+  white-space: pre;
+  overflow: auto;
+  height: 96vh;
+  scrollbar-width: thin;
+  scrollbar-color: #888 transparent;
+}
+
+ol.linenums > li {
+  list-style-type: decimal;
+}
