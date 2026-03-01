@@ -46,9 +46,12 @@ export const createNavigator = ({ state, render }) => {
   };
 
   const probeAndNavigate = async (nextUrlString, opts = {}) => {
+    const onNotFound =
+      typeof opts?.onNotFound === "function" ? opts.onNotFound : null;
+
     if (!isHttpUrl(nextUrlString)) {
       await render.source(nextUrlString, opts);
-      return;
+      return { outcome: "source" };
     }
 
     let nextUrl;
@@ -56,11 +59,13 @@ export const createNavigator = ({ state, render }) => {
       nextUrl = new URL(nextUrlString);
     } catch {
       await render.source(nextUrlString, opts);
-      return;
+      return { outcome: "source" };
     }
 
     const pageOrigin = getPageOrigin();
-    if (pageOrigin && nextUrl.origin !== pageOrigin) return;
+    if (pageOrigin && nextUrl.origin !== pageOrigin) {
+      return { outcome: "blocked" };
+    }
 
     let contentType = "";
     try {
@@ -68,6 +73,12 @@ export const createNavigator = ({ state, render }) => {
         method: "HEAD",
         credentials: "include",
       });
+
+      if (head.status === 404) {
+        onNotFound?.(nextUrl.toString());
+        return { outcome: "notfound", status: 404 };
+      }
+
       contentType = head.headers.get("content-type") || "";
     } catch {
       // ignore
@@ -77,29 +88,29 @@ export const createNavigator = ({ state, render }) => {
 
     if (classified.kind === "image") {
       render.image(nextUrl.toString());
-      return;
+      return { outcome: "image" };
     }
 
     if (classified.kind === "audio") {
       if (!canPlayAudioMime(classified.mime)) {
-        await downloadUrl(nextUrl.toString());
-        return;
+        const ok = await downloadUrl(nextUrl.toString());
+        return { outcome: ok ? "download" : "error" };
       }
 
       render.audio(nextUrl.toString(), classified.mime);
-      return;
+      return { outcome: "audio" };
     }
 
     if (classified.kind === "unknown") {
       const inferredAudioMime = inferAudioMimeFromUrl(nextUrl.toString());
       if (inferredAudioMime) {
         if (!canPlayAudioMime(inferredAudioMime)) {
-          await downloadUrl(nextUrl.toString());
-          return;
+          const ok = await downloadUrl(nextUrl.toString());
+          return { outcome: ok ? "download" : "error" };
         }
 
         render.audio(nextUrl.toString(), inferredAudioMime);
-        return;
+        return { outcome: "audio" };
       }
     }
 
@@ -107,22 +118,33 @@ export const createNavigator = ({ state, render }) => {
       const inferredAudioMime = inferAudioMimeFromUrl(nextUrl.toString());
       if (inferredAudioMime && canPlayAudioMime(inferredAudioMime)) {
         render.audio(nextUrl.toString(), inferredAudioMime);
-        return;
+        return { outcome: "audio" };
       }
     }
 
     if (classified.kind === "text" || classified.kind === "unknown") {
-      await render.source(nextUrl.toString(), {
+      const result = await render.source(nextUrl.toString(), {
         ...opts,
         languageHint:
           opts?.languageHint ||
           inferLanguageFromContentType(contentType) ||
           inferLanguageFromUrl(nextUrl.toString()),
       });
-      return;
+
+      if (result?.status === 404 && result?.committed === false) {
+        onNotFound?.(nextUrl.toString());
+        return { outcome: "notfound", status: 404 };
+      }
+
+      return {
+        outcome: "source",
+        ok: typeof result?.ok === "boolean" ? result.ok : null,
+        status: result?.status ?? null,
+      };
     }
 
-    await downloadUrl(nextUrl.toString());
+    const ok = await downloadUrl(nextUrl.toString());
+    return { outcome: ok ? "download" : "error" };
   };
 
   return {

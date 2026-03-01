@@ -1,4 +1,5 @@
 import { getDom } from "./modules/dom.js";
+import { createExtrasCache } from "./modules/extrasCache.js";
 import { createFileBar } from "./modules/fileBar.js";
 import { createHighlighter } from "./modules/highlight.js";
 import { createMenu } from "./modules/menu.js";
@@ -37,6 +38,8 @@ import { inferLanguageFromUrl } from "./modules/utils.js";
 
   const navigator = createNavigator({ state, render });
 
+  const extrasCache = createExtrasCache();
+
   const menu = createMenu({
     menuContainer: dom.menuContainer,
     burgerButton: dom.burgerButton,
@@ -44,6 +47,9 @@ import { inferLanguageFromUrl } from "./modules/utils.js";
     groups: dom.groups,
     state,
     render,
+    probeAndNavigate: navigator.probeAndNavigate,
+    inferLanguageFromUrl,
+    extrasCache,
   });
 
   menu.init();
@@ -52,6 +58,7 @@ import { inferLanguageFromUrl } from "./modules/utils.js";
     probeAndNavigate: navigator.probeAndNavigate,
     setActiveMenuEl: menu.setActiveMenuEl,
     inferLanguageFromUrl,
+    onSubmittedUrl: menu.maybeAddExtraUrl,
   });
 
   const init = async () => {
@@ -69,6 +76,9 @@ import { inferLanguageFromUrl } from "./modules/utils.js";
     }
 
     state.pageUrl = state.tab?.url ?? null;
+
+    // Load cached Extras for the exact page URL (per-page isolation).
+    state.extras = await extrasCache.loadForPageUrl(state.pageUrl);
 
     chrome.tabs.onUpdated.addListener((updatedTabId, changeInfo) => {
       if (updatedTabId === state.tab?.id && changeInfo.url) {

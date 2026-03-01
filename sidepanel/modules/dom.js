@@ -34,6 +34,13 @@ export const getDom = () => {
       ),
       submenu: document.getElementById("menu-images"),
     },
+    extras: {
+      group: burgerMenu.querySelector('.menuGroup[data-group="extras"]'),
+      toggle: burgerMenu.querySelector(
+        '.menuGroup[data-group="extras"] button[data-toggle]',
+      ),
+      submenu: document.getElementById("menu-extras"),
+    },
   };
 
   return {

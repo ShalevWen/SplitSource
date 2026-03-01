@@ -1,8 +1,8 @@
 {
   "name": "Split Source",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "manifest_version": 3,
-  "permissions": ["tabs", "sidePanel", "scripting"],
+  "permissions": ["tabs", "sidePanel", "scripting", "storage"],
   "host_permissions": ["*://*/"],
   "background": {
     "service_worker": "background.js"

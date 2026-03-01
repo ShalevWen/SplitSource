@@ -5,4 +5,8 @@ export const createState = () => ({
   currentUrl: null,
   currentViewMode: null,
   fileSwapContext: null,
+  docInfoReady: false,
+  knownResourceUrls: new Set(),
+  extras: [],
+  pendingExtras: [],
 });

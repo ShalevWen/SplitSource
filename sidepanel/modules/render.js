@@ -98,38 +98,70 @@ export const createRenderer = ({ root, state, highlighter, setFileBar }) => {
   };
 
   const source = async (url, opts = {}) => {
-    resetRootForRender("source");
+    const preserveViewOn404 = opts?.preserveViewOn404 === true;
 
     if (!url) {
+      resetRootForRender("source");
       root.textContent = "No active tab URL.";
-      return;
+      return { ok: false, committed: true, status: null };
     }
 
     if (!isHttpUrl(url)) {
+      resetRootForRender("source");
       root.textContent = `Unsupported URL: ${url}`;
       setFileBar(null);
-      return;
+      return { ok: false, committed: true, status: null };
     }
-
-    state.currentUrl = url;
-    const swapCtx =
-      getFileSwapContext(url) ||
-      (url === state.pageUrl ? getPageSwapContext(url) : null);
-    setFileBar(swapCtx);
 
     state.fetchController?.abort();
     const controller = new AbortController();
     state.fetchController = controller;
 
-    root.textContent = `view-source:${url}\n\nLoading…`;
+    const commitUi = () => {
+      resetRootForRender("source");
+      state.currentUrl = url;
+      const swapCtx =
+        getFileSwapContext(url) ||
+        (url === state.pageUrl ? getPageSwapContext(url) : null);
+      setFileBar(swapCtx);
+    };
+
+    if (!preserveViewOn404) {
+      commitUi();
+      root.textContent = `view-source:${url}\n\nLoading…`;
+    }
 
     try {
       const res = await fetch(url, {
         credentials: "include",
         signal: controller.signal,
       });
+
+      if (controller.signal.aborted) {
+        return { ok: false, committed: false, aborted: true, status: null };
+      }
+
+      if (!res.ok) {
+        if (preserveViewOn404 && res.status === 404) {
+          return { ok: false, committed: false, status: 404 };
+        }
+
+        if (preserveViewOn404) {
+          commitUi();
+        }
+
+        root.textContent = `Failed to load source (${res.status}${res.statusText ? ` ${res.statusText}` : ""}).`;
+        return { ok: false, committed: true, status: res.status };
+      }
+
       const text = await res.text();
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted) {
+        return { ok: false, committed: false, aborted: true, status: null };
+      }
+
+      if (preserveViewOn404) {
+        commitUi();
+      }
 
       root.textContent = text;
 
@@ -143,9 +175,18 @@ export const createRenderer = ({ root, state, highlighter, setFileBar }) => {
         null;
 
       highlighter.scheduleHighlight(text, lang);
+      return { ok: true, committed: true, status: res.status };
     } catch (err) {
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted) {
+        return { ok: false, committed: false, aborted: true, status: null };
+      }
+
+      if (preserveViewOn404) {
+        commitUi();
+      }
+
       root.textContent = `Failed to load source: ${err?.message ?? String(err)}`;
+      return { ok: false, committed: true, status: null };
     } finally {
       if (state.fetchController === controller) state.fetchController = null;
     }

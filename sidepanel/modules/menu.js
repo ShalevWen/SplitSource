@@ -5,6 +5,9 @@ export const createMenu = ({
   groups,
   state,
   render,
+  probeAndNavigate,
+  inferLanguageFromUrl,
+  extrasCache,
 }) => {
   const setActiveMenuEl = (el) => {
     for (const prev of burgerMenu.querySelectorAll(".isActive")) {
@@ -222,6 +225,18 @@ export const createMenu = ({
         setActiveMenuEl(itemButton);
         render.image(url);
         menu.setOpen(false);
+        return;
+      }
+
+      if (kind === "extras" && typeof probeAndNavigate === "function") {
+        setActiveMenuEl(itemButton);
+        void probeAndNavigate(url, {
+          languageHint:
+            typeof inferLanguageFromUrl === "function"
+              ? inferLanguageFromUrl(url)
+              : null,
+        });
+        menu.setOpen(false);
       }
     });
 
@@ -239,18 +254,72 @@ export const createMenu = ({
   };
 
   const populateFromDocInfo = (docInfo) => {
+    state.docInfoReady = true;
+    state.knownResourceUrls = new Set([
+      ...(Array.isArray(docInfo?.scripts) ? docInfo.scripts : []),
+      ...(Array.isArray(docInfo?.styleSheets) ? docInfo.styleSheets : []),
+      ...(Array.isArray(docInfo?.images) ? docInfo.images : []),
+    ]);
+
+    // If the user entered URLs before docInfo was ready, process them now.
+    if (Array.isArray(state.pendingExtras) && state.pendingExtras.length > 0) {
+      const pending = state.pendingExtras;
+      state.pendingExtras = [];
+      for (const url of pending) {
+        if (typeof url !== "string" || url.length === 0) continue;
+        if (state.knownResourceUrls?.has?.(url)) continue;
+        if (!Array.isArray(state.extras)) state.extras = [];
+        if (state.extras.includes(url)) continue;
+        state.extras.push(url);
+      }
+    }
+
+    // Remove anything that is now part of the known resource lists.
+    if (Array.isArray(state.extras) && state.extras.length > 0) {
+      const filtered = state.extras.filter(
+        (u) => !state.knownResourceUrls?.has?.(u),
+      );
+      if (filtered.length !== state.extras.length) {
+        state.extras = filtered;
+        void extrasCache?.saveForPageUrl?.(state.pageUrl, state.extras);
+      }
+    }
+
     const scriptsCount = populateSubmenu("scripts", docInfo.scripts);
     const stylesheetsCount = populateSubmenu(
       "stylesheets",
       docInfo.styleSheets,
     );
     const imagesCount = populateSubmenu("images", docInfo.images);
+    const extrasCount = populateSubmenu("extras", state.extras);
 
     setGroupVisible("scripts", scriptsCount > 0);
     setGroupVisible("stylesheets", stylesheetsCount > 0);
     setGroupVisible("images", imagesCount > 0);
+    setGroupVisible("extras", extrasCount > 0);
 
     menu.show();
+  };
+
+  const maybeAddExtraUrl = (url) => {
+    if (typeof url !== "string" || url.length === 0) return;
+
+    if (!state.docInfoReady) {
+      if (!Array.isArray(state.pendingExtras)) state.pendingExtras = [];
+      if (!state.pendingExtras.includes(url)) state.pendingExtras.push(url);
+      return;
+    }
+
+    if (state.knownResourceUrls?.has?.(url)) return;
+    if (Array.isArray(state.extras) && state.extras.includes(url)) return;
+
+    if (!Array.isArray(state.extras)) state.extras = [];
+    state.extras.push(url);
+
+    const extrasCount = populateSubmenu("extras", state.extras);
+    setGroupVisible("extras", extrasCount > 0);
+
+    void extrasCache?.saveForPageUrl?.(state.pageUrl, state.extras);
   };
 
   return {
@@ -258,5 +327,6 @@ export const createMenu = ({
     menu,
     setActiveMenuEl,
     populateFromDocInfo,
+    maybeAddExtraUrl,
   };
 };

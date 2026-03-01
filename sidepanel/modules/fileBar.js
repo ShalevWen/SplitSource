@@ -80,10 +80,16 @@ export const createFileBar = ({ fileBar, fileNameInput, state }) => {
     probeAndNavigate,
     setActiveMenuEl,
     inferLanguageFromUrl,
+    onSubmittedUrl,
   }) => {
     if (!fileBar || !fileNameInput) return;
 
     fileNameInput.placeholder = "/path/to/file.ext";
+
+    // Clear any previous validation message as the user edits.
+    fileNameInput.addEventListener("input", () => {
+      fileNameInput.setCustomValidity("");
+    });
 
     fileBar.addEventListener("submit", (e) => {
       e.preventDefault();
@@ -109,8 +115,6 @@ export const createFileBar = ({ fileBar, fileNameInput, state }) => {
 
       if (nextUrl.origin !== ctx.url.origin) return;
 
-      setActiveMenuEl(null);
-
       const prevCtx = state.fileSwapContext;
       const prevMode = state.currentViewMode;
       const prevUrl = state.currentUrl;
@@ -118,10 +122,42 @@ export const createFileBar = ({ fileBar, fileNameInput, state }) => {
       const nextUrlString = nextUrl.toString();
 
       void (async () => {
-        await probeAndNavigate(nextUrlString, {
+        fileNameInput.setCustomValidity("");
+
+        const result = await probeAndNavigate(nextUrlString, {
           languageHint: inferLanguageFromUrl(nextUrlString),
+          preserveViewOn404: true,
+          onNotFound: () => {
+            fileNameInput.setCustomValidity("Not found (404).");
+            fileNameInput.reportValidity();
+          },
         });
 
+        if (result?.outcome === "notfound") {
+          // Stay on current view; keep menu highlight.
+          return;
+        }
+
+        if (result?.outcome === "blocked" || result?.outcome === "error") {
+          return;
+        }
+
+        setActiveMenuEl(null);
+
+        if (
+          result?.outcome === "source" &&
+          typeof result?.ok === "boolean" &&
+          result.ok === false
+        ) {
+          return;
+        }
+
+        if (typeof onSubmittedUrl === "function") {
+          onSubmittedUrl(nextUrlString);
+        }
+
+        // If the navigation resulted in a download (or otherwise didn't change the view),
+        // restore the bar to the current view context.
         if (
           state.currentUrl === prevUrl &&
           state.currentViewMode === prevMode
