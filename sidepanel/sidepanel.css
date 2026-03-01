@@ -1,26 +1,73 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  color-scheme: dark;
+
+  --bg: #0b0d10;
+  --surface: #3c3c3c;
+  --surface-2: #4f4f4f;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.2);
+
+  --text: rgba(255, 255, 255, 0.86);
+  --muted: rgba(255, 255, 255, 0.72);
+
+  --hover: rgba(255, 255, 255, 0.06);
+  --press: rgba(255, 255, 255, 0.09);
+  --focus: rgba(122, 162, 247, 0.9);
+  --active: rgba(122, 162, 247, 0.18);
+  --active-border: rgba(122, 162, 247, 0.28);
+}
+
 html,
 body {
   margin: 0;
   height: 100%;
-  background: black;
+  background: var(--bg);
   overflow: hidden;
-}
-
-pre.prettyprint {
-  width: unset;
 }
 
 #root {
   margin: 0;
   padding: 0.75rem;
-  font-size: 0.7rem;
+  font:
+    0.8rem/1.45 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    "Liberation Mono",
+    "Courier New",
+    monospace !important;
+  color: var(--text);
   white-space: pre;
   overflow: auto;
   height: 100%;
-  box-sizing: border-box;
   /* width: 100%; */
   scrollbar-width: thin;
-  scrollbar-color: #888 transparent;
+  /* scrollbar-color: rgba(255, 255, 255, 0.22) transparent; */
+  overscroll-behavior: none;
+  scrollbar-gutter: stable;
+
+  &::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    /* background: rgba(255, 255, 255, 0.18); */
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    /* background: rgba(255, 255, 255, 0.26); */
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
 
   &.imageView {
     white-space: normal;
@@ -34,8 +81,37 @@ pre.prettyprint {
       max-width: 100%;
       max-height: calc(100% - 2 * var(--margin));
       object-fit: contain;
+
+      opacity: 0;
+      transition: opacity 220ms ease;
+
+      &.isLoaded {
+        opacity: 1;
+      }
     }
   }
+}
+
+/* Speed Highlight theme integration (keep its token colors, override its layout) */
+#root[class*="shj-lang-"] {
+  margin: 0;
+  padding: 0.75rem;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  max-width: none;
+  text-shadow: none;
+  font: inherit;
+}
+
+/* Avoid nested scrollbars inside the highlight wrapper */
+#root[class*="shj-lang-"] > div {
+  overflow: visible;
+}
+
+/* Make line numbers a bit subtler in our UI */
+#root .shj-numbers div:before {
+  opacity: 0.45;
 }
 
 #menuContainer {
@@ -45,7 +121,7 @@ pre.prettyprint {
   z-index: 10;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 160ms ease;
+  transition: opacity 220ms cubic-bezier(0.22, 1, 0.36, 1);
 
   &.ready {
     opacity: 1;
@@ -62,29 +138,37 @@ pre.prettyprint {
 }
 
 #burger {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   padding: 0;
   border: 0;
-  border-radius: 4px;
-  background-color: #333;
+  border-radius: 8px;
+  background: var(--surface);
+  outline: 1px solid var(--border);
   cursor: pointer;
   display: grid;
   place-items: center;
-  transition: background-color 160ms ease;
+  transition:
+    background-color 180ms ease,
+    transform 120ms ease;
 
   &:hover {
-    background-color: #555;
+    background: var(--surface-2);
   }
 
   &:focus-visible {
-    outline: 1px solid #888;
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
 
+  &:active {
+    transform: scale(0.97);
+  }
+
   img {
-    width: 85%;
-    height: 85%;
+    width: 72%;
+    height: 72%;
+    opacity: 0.9;
   }
 }
 
@@ -95,28 +179,44 @@ pre.prettyprint {
   min-width: 10rem;
   width: 16rem;
   max-width: calc(100vw - 2rem);
-  padding: 0.25rem;
-  border-radius: 6px;
-  background-color: #555;
-  border: 1px solid #777;
+  padding: 0.45rem;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
   box-sizing: border-box;
   opacity: 0;
-  transform: translateY(-6px) scale(0.98);
+  transform: translateY(-8px) scale(0.985);
+  transform-origin: top right;
   pointer-events: none;
   transition:
-    opacity 160ms ease,
-    transform 160ms ease;
+    opacity 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+
+  backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
 
   .menuGroup {
+    margin-top: 0.2rem;
+
+    &:first-of-type {
+      margin-top: 0;
+    }
+
     &.open {
       .submenu {
         max-height: 50vh;
         opacity: 1;
         transform: translateY(0);
+
+        /* Gives breathing room between the toggle and first item */
+        padding-top: 0.25rem;
       }
 
       .menuToggle {
-        background-color: #2a2a2a;
+        background: var(--hover);
       }
     }
   }
@@ -126,31 +226,46 @@ pre.prettyprint {
   width: 100%;
   padding: 0.5rem 0.75rem;
   border: 0;
-  border-radius: 4px;
+  border-radius: 10px;
   background: transparent;
-  color: #888;
+  color: var(--text);
   text-align: left;
   cursor: pointer;
-  transition: background-color 160ms ease;
+  transition:
+    background-color 180ms ease,
+    transform 120ms ease;
 
   &:hover {
-    background-color: #555;
+    background: var(--hover);
   }
 
   &:focus-visible {
-    outline: 1px solid #888;
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  &:active {
+    transform: translateY(1px);
+    background: var(--press);
+  }
+
+  &.isActive {
+    background: var(--active);
+    outline: 1px solid var(--active-border);
   }
 }
 
 .submenu {
+  padding: 0;
   max-height: 0;
   overflow: hidden;
   opacity: 0;
   transform: translateY(-4px);
   transition:
-    max-height 200ms ease,
-    opacity 160ms ease,
-    transform 160ms ease;
+    max-height 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms ease,
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: max-height, opacity, transform;
 }
 
 .submenuItem {
@@ -158,9 +273,9 @@ pre.prettyprint {
   width: 100%;
   padding: 0.4rem 0.75rem 0.4rem 1.25rem;
   border: 0;
-  border-radius: 4px;
+  border-radius: 10px;
   background: transparent;
-  color: #888;
+  color: var(--text);
   box-sizing: border-box;
   max-width: 100%;
   text-align: left;
@@ -170,15 +285,42 @@ pre.prettyprint {
   overflow: hidden;
   text-overflow: ellipsis;
 
+  & + & {
+    margin-top: 0.2rem;
+  }
+
+  transition:
+    background-color 180ms ease,
+    transform 120ms ease;
+
   &:hover {
-    background-color: #555;
+    background: var(--hover);
   }
 
   &:focus-visible {
-    outline: 1px solid #888;
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  &:active {
+    transform: translateY(1px);
+    background: var(--press);
+  }
+
+  &.isActive {
+    background: var(--active);
+    outline: 1px solid var(--active-border);
   }
 }
 
-ol.linenums > li {
-  list-style-type: decimal;
+@media (prefers-reduced-motion: reduce) {
+  #menuContainer,
+  #burger,
+  #burgerMenu,
+  .menuItem,
+  .submenu,
+  .submenuItem,
+  #root.imageView img {
+    transition: none !important;
+  }
 }

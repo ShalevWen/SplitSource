@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "build": "node scripts/build.cjs"
+  },
   "devDependencies": {
     "chrome-types": "^0.1.415"
   }
