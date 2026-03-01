@@ -10,6 +10,66 @@
   </head>
   <body>
     <pre class="prettyprint linenums" id="root">Loading…</pre>
+    <div id="menuContainer">
+      <button
+        id="burger"
+        type="button"
+        aria-haspopup="true"
+        aria-expanded="false"
+        aria-controls="burgerMenu"
+      >
+        <img src="/assets/menu.svg" alt="Menu" />
+      </button>
+      <div id="burgerMenu" role="menu" aria-hidden="true">
+        <button
+          class="menuItem"
+          type="button"
+          role="menuitem"
+          data-action="page"
+        >
+          Page
+        </button>
+
+        <div class="menuGroup" data-group="scripts">
+          <button
+            class="menuItem menuToggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="menu-scripts"
+            data-toggle="scripts"
+          >
+            Scripts
+          </button>
+          <div class="submenu" id="menu-scripts" aria-hidden="true"></div>
+        </div>
+
+        <div class="menuGroup" data-group="stylesheets">
+          <button
+            class="menuItem menuToggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="menu-stylesheets"
+            data-toggle="stylesheets"
+          >
+            Stylesheets
+          </button>
+          <div class="submenu" id="menu-stylesheets" aria-hidden="true"></div>
+        </div>
+
+        <div class="menuGroup" data-group="images">
+          <button
+            class="menuItem menuToggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="menu-images"
+            data-toggle="images"
+          >
+            Images
+          </button>
+          <div class="submenu" id="menu-images" aria-hidden="true"></div>
+        </div>
+      </div>
+    </div>
     <script src="/google-code-prettify/prettify.js"></script>
     <script src="./sidepanel.js"></script>
   </body>

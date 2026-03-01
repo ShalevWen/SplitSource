@@ -1,6 +1,6 @@
 chrome.sidePanel.setOptions?.({
-    enabled: false,
-  });
+  enabled: false,
+});
 
 function openSidePanelForTab(tab) {
   if (!tab?.id) return;
@@ -15,7 +15,3 @@ function openSidePanelForTab(tab) {
 chrome.action.onClicked.addListener((tab) => {
   openSidePanelForTab(tab);
 });
-
-// chrome.commands.onCommand.addListener((command, tab) => {
-//   openSidePanelForTab(tab);
-// });

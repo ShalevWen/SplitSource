@@ -1,7 +1,13 @@
+html,
 body {
   margin: 0;
-  height: 100vh;
+  height: 100%;
   background: black;
+  overflow: hidden;
+}
+
+pre.prettyprint {
+  width: unset;
 }
 
 #root {
@@ -10,9 +16,167 @@ body {
   font-size: 0.7rem;
   white-space: pre;
   overflow: auto;
-  height: 96vh;
+  height: 100%;
+  box-sizing: border-box;
+  /* width: 100%; */
   scrollbar-width: thin;
   scrollbar-color: #888 transparent;
+
+  &.imageView {
+    white-space: normal;
+
+    img {
+      --margin: 5rem;
+      display: block;
+      margin: var(--margin) auto;
+      width: 100%;
+      height: calc(100% - 2 * var(--margin));
+      max-width: 100%;
+      max-height: calc(100% - 2 * var(--margin));
+      object-fit: contain;
+    }
+  }
+}
+
+#menuContainer {
+  position: absolute;
+  top: 0.5rem;
+  right: 1rem;
+  z-index: 10;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+
+  &.ready {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  &.open {
+    #burgerMenu {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+    }
+  }
+}
+
+#burger {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background-color: #333;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background-color 160ms ease;
+
+  &:hover {
+    background-color: #555;
+  }
+
+  &:focus-visible {
+    outline: 1px solid #888;
+    outline-offset: 2px;
+  }
+
+  img {
+    width: 85%;
+    height: 85%;
+  }
+}
+
+#burgerMenu {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  right: 0;
+  min-width: 10rem;
+  width: 16rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.25rem;
+  border-radius: 6px;
+  background-color: #555;
+  border: 1px solid #777;
+  box-sizing: border-box;
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
+  pointer-events: none;
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+
+  .menuGroup {
+    &.open {
+      .submenu {
+        max-height: 50vh;
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .menuToggle {
+        background-color: #2a2a2a;
+      }
+    }
+  }
+}
+
+.menuItem {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #888;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+
+  &:hover {
+    background-color: #555;
+  }
+
+  &:focus-visible {
+    outline: 1px solid #888;
+  }
+}
+
+.submenu {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    max-height 200ms ease,
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.submenuItem {
+  display: block;
+  width: 100%;
+  padding: 0.4rem 0.75rem 0.4rem 1.25rem;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #888;
+  box-sizing: border-box;
+  max-width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-size: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  &:hover {
+    background-color: #555;
+  }
+
+  &:focus-visible {
+    outline: 1px solid #888;
+  }
 }
 
 ol.linenums > li {
