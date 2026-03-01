@@ -317,6 +317,22 @@ body {
   will-change: max-height, opacity, transform;
 }
 
+.submenuRow {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+
+  & + & {
+    margin-top: 0.2rem;
+  }
+
+  > .submenuItem {
+    width: auto;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
 .submenuItem {
   display: block;
   width: 100%;
@@ -362,6 +378,37 @@ body {
   }
 }
 
+.submenuRemove {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition:
+    background-color 180ms ease,
+    transform 120ms ease;
+
+  &:hover {
+    background: var(--hover);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  &:active {
+    transform: translateY(1px);
+    background: var(--press);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   #menuContainer,
   #burger,
@@ -369,6 +416,7 @@ body {
   .menuItem,
   .submenu,
   .submenuItem,
+  .submenuRemove,
   #root.imageView img {
     transition: none !important;
   }

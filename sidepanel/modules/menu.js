@@ -165,15 +165,42 @@ export const createMenu = ({
       if (typeof url !== "string" || url.length === 0) continue;
       count++;
 
-      const item = document.createElement("button");
-      item.type = "button";
-      item.className = "submenuItem";
-      item.setAttribute("role", "menuitem");
-      item.dataset.kind = kind;
-      item.dataset.url = url;
-      item.title = url;
-      item.textContent = displayNameFromUrl(url, i);
-      fragment.appendChild(item);
+      if (kind === "extras") {
+        const row = document.createElement("div");
+        row.className = "submenuRow";
+
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "submenuItem";
+        item.setAttribute("role", "menuitem");
+        item.dataset.kind = kind;
+        item.dataset.url = url;
+        item.title = url;
+        item.textContent = displayNameFromUrl(url, i);
+
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "submenuRemove";
+        remove.setAttribute("role", "menuitem");
+        remove.setAttribute("aria-label", "Remove");
+        remove.dataset.kind = kind;
+        remove.dataset.url = url;
+        remove.textContent = "×";
+
+        row.appendChild(item);
+        row.appendChild(remove);
+        fragment.appendChild(row);
+      } else {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "submenuItem";
+        item.setAttribute("role", "menuitem");
+        item.dataset.kind = kind;
+        item.dataset.url = url;
+        item.title = url;
+        item.textContent = displayNameFromUrl(url, i);
+        fragment.appendChild(item);
+      }
     }
 
     container.appendChild(fragment);
@@ -204,6 +231,36 @@ export const createMenu = ({
       const toggleKind = toggleButton?.dataset?.toggle;
       if (toggleKind && toggleKind in groups) {
         openGroupExclusive(toggleKind, toggleButton);
+        return;
+      }
+
+      const removeButton = e.target?.closest?.(
+        "button.submenuRemove[data-kind=\"extras\"][data-url]",
+      );
+      if (removeButton) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const url = removeButton.dataset.url;
+        if (!url || typeof url !== "string") return;
+
+        if (Array.isArray(state.extras) && state.extras.length > 0) {
+          const next = state.extras.filter((u) => u !== url);
+          if (next.length !== state.extras.length) {
+            state.extras = next;
+
+            const active = burgerMenu.querySelector(".isActive[data-url]");
+            if (active?.dataset?.url === url) setActiveMenuEl(null);
+
+            const extrasCount = populateSubmenu("extras", state.extras);
+            setGroupVisible("extras", extrasCount > 0);
+
+            void extrasCache?.saveForPageUrl?.(state.pageUrl, state.extras);
+
+            groups.extras?.toggle?.focus?.({ preventScroll: true });
+          }
+        }
+
         return;
       }
 
