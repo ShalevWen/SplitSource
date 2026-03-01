@@ -5,6 +5,8 @@ import { highlightText } from "/speed-highlight/dist/index.js";
   "use strict";
 
   const elRoot = document.getElementById("root");
+  const elFileBar = document.getElementById("fileBar");
+  const elFileNameInput = document.getElementById("fileNameInput");
   const elMenuContainer = document.getElementById("menuContainer");
   const elBurgerButton = document.getElementById("burger");
   const elBurgerMenu = document.getElementById("burgerMenu");
@@ -45,6 +47,9 @@ import { highlightText } from "/speed-highlight/dist/index.js";
     highlightToken: 0,
     highlightHandle: null,
     highlightHandleKind: null,
+    currentUrl: null,
+    currentViewMode: null,
+    fileSwapContext: null,
   };
 
   const isHttpUrl = (url) => typeof url === "string" && /^https?:/i.test(url);
@@ -76,10 +81,67 @@ import { highlightText } from "/speed-highlight/dist/index.js";
     }
   };
 
+  const getFileSwapContext = (urlString) => {
+    if (typeof urlString !== "string") return null;
+    if (!/^https?:/i.test(urlString)) return null;
+    if (urlString.startsWith("data:") || urlString.startsWith("blob:"))
+      return null;
+
+    try {
+      const url = new URL(urlString);
+      const segments = url.pathname.split("/").filter(Boolean);
+      const last = segments.at(-1);
+      if (!last) return null;
+
+      const filename = decodeURIComponent(last);
+
+      // "Normal" filename heuristic: reasonably short + has an extension + not a
+      // key=value style segment.
+      const isNormal =
+        filename.length <= 80 &&
+        !filename.includes("=") &&
+        /\.[a-z0-9]{1,6}$/i.test(filename) &&
+        !/[\\/]/.test(filename);
+
+      if (!isNormal) return null;
+
+      return {
+        url,
+        segments,
+        filename,
+        relativePath: `${url.pathname}${url.search}`,
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const setFileBar = (ctx) => {
+    if (!elFileBar || !elFileNameInput) return;
+
+    state.fileSwapContext = ctx;
+
+    if (!ctx) {
+      elFileBar.hidden = true;
+      elFileNameInput.value = "";
+      elFileNameInput.disabled = true;
+      elFileNameInput.removeAttribute("title");
+      return;
+    }
+
+    elFileBar.hidden = false;
+    elFileNameInput.disabled = false;
+    elFileNameInput.value = ctx.relativePath;
+    elFileNameInput.title = ctx.url.toString();
+  };
+
   const resetRootForRender = (mode) => {
     cancelPendingHighlight();
     stripSpeedHighlightClasses();
     elRoot.classList.toggle("imageView", mode === "image");
+    elRoot.classList.toggle("audioView", mode === "audio");
+
+    state.currentViewMode = mode;
   };
 
   const inferLanguageFromUrl = (urlString) => {
@@ -137,6 +199,197 @@ import { highlightText } from "/speed-highlight/dist/index.js";
     return null;
   };
 
+  const getFilenameFromPathname = (pathname) => {
+    if (typeof pathname !== "string") return "download";
+    const last = pathname.split("/").filter(Boolean).at(-1);
+    return last ? decodeURIComponent(last) : "download";
+  };
+
+  const classifyMimeType = (contentType) => {
+    if (typeof contentType !== "string" || contentType.length === 0)
+      return { kind: "unknown", mime: "" };
+    const mime = contentType.split(";", 1)[0].trim().toLowerCase();
+    if (mime.startsWith("image/")) return { kind: "image", mime };
+    if (mime.startsWith("audio/")) return { kind: "audio", mime };
+    if (mime.startsWith("text/")) return { kind: "text", mime };
+
+    if (
+      mime.includes("json") ||
+      mime.includes("javascript") ||
+      mime.includes("ecmascript") ||
+      mime.includes("xml") ||
+      mime.includes("yaml")
+    ) {
+      return { kind: "text", mime };
+    }
+
+    // Treat everything else as a download (fonts, binaries, etc.).
+    return { kind: "download", mime };
+  };
+
+  const inferAudioMimeFromUrl = (urlString) => {
+    if (typeof urlString !== "string") return "";
+    try {
+      const url = new URL(urlString);
+      const path = url.pathname.toLowerCase();
+      const ext = path.includes(".") ? path.split(".").pop() : "";
+
+      switch (ext) {
+        case "mp3":
+          return "audio/mpeg";
+        case "m4a":
+          return "audio/mp4";
+        case "aac":
+          return "audio/aac";
+        case "wav":
+          return "audio/wav";
+        case "oga":
+        case "ogg":
+          return "audio/ogg";
+        case "opus":
+          return "audio/opus";
+        case "flac":
+          return "audio/flac";
+        case "weba":
+          return "audio/webm";
+        default:
+          return "";
+      }
+    } catch {
+      return "";
+    }
+  };
+
+  const canPlayAudioMime = (mime) => {
+    if (typeof mime !== "string" || mime.length === 0) return true;
+    try {
+      const el = document.createElement("audio");
+      const verdict = el.canPlayType(mime);
+      return verdict === "probably" || verdict === "maybe";
+    } catch {
+      return true;
+    }
+  };
+
+  const downloadUrl = async (url) => {
+    try {
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) return false;
+      const blob = await res.blob();
+      downloadBlob(blob, getFilenameFromPathname(new URL(url).pathname));
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const downloadBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    try {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename || "download";
+      a.rel = "noopener";
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  const probeAndNavigate = async (nextUrlString, opts = {}) => {
+    if (!isHttpUrl(nextUrlString)) {
+      // Falls back to the existing behavior.
+      await render.source(nextUrlString, opts);
+      return;
+    }
+
+    let nextUrl;
+    try {
+      nextUrl = new URL(nextUrlString);
+    } catch {
+      await render.source(nextUrlString, opts);
+      return;
+    }
+
+    // Enforce same-origin navigation.
+    // (Menus are already same-origin filtered, but user input can be anything.)
+    const pageOrigin = (() => {
+      try {
+        return state.pageUrl ? new URL(state.pageUrl).origin : null;
+      } catch {
+        return null;
+      }
+    })();
+
+    if (pageOrigin && nextUrl.origin !== pageOrigin) return;
+
+    // Probe type cheaply via HEAD first.
+    let contentType = "";
+    try {
+      const head = await fetch(nextUrl.toString(), {
+        method: "HEAD",
+        credentials: "include",
+      });
+      contentType = head.headers.get("content-type") || "";
+    } catch {
+      // ignore
+    }
+
+    // If server doesn't support HEAD / doesn't return content-type, fallback to ext.
+    const classified = classifyMimeType(contentType);
+    if (classified.kind === "image") {
+      render.image(nextUrl.toString());
+      return;
+    }
+
+    if (classified.kind === "audio") {
+      if (!canPlayAudioMime(classified.mime)) {
+        await downloadUrl(nextUrl.toString());
+        return;
+      }
+      render.audio(nextUrl.toString(), classified.mime);
+      return;
+    }
+
+    if (classified.kind === "unknown") {
+      const inferredAudioMime = inferAudioMimeFromUrl(nextUrl.toString());
+      if (inferredAudioMime) {
+        if (!canPlayAudioMime(inferredAudioMime)) {
+          await downloadUrl(nextUrl.toString());
+          return;
+        }
+        render.audio(nextUrl.toString(), inferredAudioMime);
+        return;
+      }
+    }
+
+    if (classified.kind === "download") {
+      const inferredAudioMime = inferAudioMimeFromUrl(nextUrl.toString());
+      if (inferredAudioMime && canPlayAudioMime(inferredAudioMime)) {
+        render.audio(nextUrl.toString(), inferredAudioMime);
+        return;
+      }
+    }
+
+    if (classified.kind === "text" || classified.kind === "unknown") {
+      // For unknown, still try source rendering (safe + consistent).
+      await render.source(nextUrl.toString(), {
+        ...opts,
+        languageHint:
+          opts?.languageHint ||
+          inferLanguageFromContentType(contentType) ||
+          inferLanguageFromUrl(nextUrl.toString()),
+      });
+      return;
+    }
+
+    // Download case: keep the previous view intact.
+    await downloadUrl(nextUrl.toString());
+  };
+
   const scheduleHighlight = (text, lang) => {
     if (typeof text !== "string" || text.length === 0) return;
 
@@ -186,14 +439,28 @@ import { highlightText } from "/speed-highlight/dist/index.js";
 
       if (!url) {
         elRoot.textContent = "No image URL.";
+        setFileBar(null);
         return;
       }
+
+      state.currentUrl = url;
+      setFileBar(getFileSwapContext(url));
 
       const img = document.createElement("img");
       img.src = url;
       img.alt = "";
       img.loading = "lazy";
       img.decoding = "async";
+
+      img.addEventListener(
+        "error",
+        () => {
+          // Keep the URL accessible via the file bar tooltip.
+          elRoot.textContent = `Failed to load image.`;
+          setFileBar(getFileSwapContext(url));
+        },
+        { once: true },
+      );
 
       img.addEventListener(
         "load",
@@ -210,6 +477,45 @@ import { highlightText } from "/speed-highlight/dist/index.js";
       }
     },
 
+    audio(url, mime) {
+      resetRootForRender("audio");
+
+      if (!url) {
+        elRoot.textContent = "No audio URL.";
+        setFileBar(null);
+        return;
+      }
+
+      if (!isHttpUrl(url)) {
+        elRoot.textContent = `Unsupported URL: ${url}`;
+        setFileBar(null);
+        return;
+      }
+
+      state.currentUrl = url;
+      setFileBar(getFileSwapContext(url));
+
+      const elAudio = document.createElement("audio");
+      elAudio.controls = true;
+      elAudio.preload = "metadata";
+
+      const source = document.createElement("source");
+      source.src = url;
+      if (typeof mime === "string" && mime.length > 0) source.type = mime;
+      elAudio.appendChild(source);
+
+      elAudio.addEventListener(
+        "error",
+        () => {
+          elRoot.textContent = "Failed to load audio.";
+          setFileBar(getFileSwapContext(url));
+        },
+        { once: true },
+      );
+
+      elRoot.replaceChildren(elAudio);
+    },
+
     async source(url, opts = {}) {
       resetRootForRender("source");
 
@@ -220,8 +526,12 @@ import { highlightText } from "/speed-highlight/dist/index.js";
 
       if (!isHttpUrl(url)) {
         elRoot.textContent = `Unsupported URL: ${url}`;
+        setFileBar(null);
         return;
       }
+
+      state.currentUrl = url;
+      setFileBar(getFileSwapContext(url));
 
       // Abort any in-flight fetch to avoid wasted work.
       state.fetchController?.abort();
@@ -256,6 +566,65 @@ import { highlightText } from "/speed-highlight/dist/index.js";
       }
     },
   };
+
+  if (elFileBar && elFileNameInput) {
+    elFileNameInput.placeholder = "/path/to/file.ext";
+
+    elFileBar.addEventListener("submit", (e) => {
+      e.preventDefault();
+
+      const ctx = state.fileSwapContext;
+      if (!ctx || !state.currentUrl) return;
+
+      let nextName = elFileNameInput.value.trim();
+      if (!nextName) return;
+
+      // Normalize Windows-style paths (user paste) into URL paths.
+      nextName = nextName.replaceAll("\\\\", "/");
+
+      // Input is intended to be origin-relative ("/path/file.ext").
+      // Reject obvious full URLs/schemes.
+      if (/^[a-z][a-z0-9+.-]*:/i.test(nextName)) return;
+
+      // Input shows an origin-relative URL path (e.g. "/static/app.js").
+      // Allow either "/..." or "..." and normalize.
+      const nextPath = nextName.startsWith("/") ? nextName : `/${nextName}`;
+
+      let nextUrl;
+      try {
+        nextUrl = new URL(nextPath, ctx.url.origin);
+      } catch {
+        return;
+      }
+
+      // Enforce same-origin navigation.
+      if (nextUrl.origin !== ctx.url.origin) return;
+
+      // Manual navigation should clear the menu highlight to avoid implying
+      // you're still viewing the exact selected resource.
+      setActiveMenuEl(null);
+
+      const prevCtx = state.fileSwapContext;
+      const prevMode = state.currentViewMode;
+      const prevUrl = state.currentUrl;
+
+      const nextUrlString = nextUrl.toString();
+
+      void (async () => {
+        await probeAndNavigate(nextUrlString, {
+          languageHint: inferLanguageFromUrl(nextUrlString),
+        });
+
+        // If we downloaded instead of navigating, restore UI state.
+        if (
+          state.currentUrl === prevUrl &&
+          state.currentViewMode === prevMode
+        ) {
+          setFileBar(prevCtx);
+        }
+      })();
+    });
+  }
 
   const setActiveMenuEl = (el) => {
     for (const prev of elBurgerMenu.querySelectorAll(".isActive")) {
@@ -360,6 +729,19 @@ import { highlightText } from "/speed-highlight/dist/index.js";
 
     try {
       const url = new URL(urlString);
+
+      // Prefer an origin-relative path for same-origin resources.
+      // This keeps labels consistent and yields a valid src-like value.
+      if (state.pageUrl) {
+        try {
+          const page = new URL(state.pageUrl);
+          if (url.origin === page.origin) {
+            return `${url.pathname}${url.search}`;
+          }
+        } catch {
+          // fall through
+        }
+      }
 
       const segments = url.pathname.split("/").filter(Boolean);
       const lastSegment = segments.at(-1) ?? "";

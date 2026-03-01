@@ -1,6 +1,6 @@
 {
   "name": "Split Source",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "manifest_version": 3,
   "permissions": ["tabs", "sidePanel", "scripting"],
   "host_permissions": ["*://*/"],

@@ -7,6 +7,20 @@
     return;
   }
 
+  const pageOrigin = document.location.origin;
+
+  const isAllowedResourceUrl = (urlString) => {
+    if (typeof urlString !== "string" || urlString.length === 0) return false;
+    if (urlString.startsWith("data:")) return true;
+
+    try {
+      const url = new URL(urlString, document.location.href);
+      return url.origin === pageOrigin;
+    } catch {
+      return false;
+    }
+  };
+
   const uniqueStrings = (arr) => {
     if (!Array.isArray(arr)) return [];
     const seen = new Set();
@@ -29,20 +43,23 @@
     styleSheets: uniqueStrings(
       Array.from(document.styleSheets)
         .map((sheet) => sheet.href)
-        .filter(Boolean),
+        .filter(Boolean)
+        .filter(isAllowedResourceUrl),
     ),
     scripts: uniqueStrings(
       Array.from(document.scripts)
         .map((script) => script.src)
-        .filter(Boolean),
+        .filter(Boolean)
+        .filter(isAllowedResourceUrl),
     ),
     images: uniqueStrings(
       Array.from(document.images)
         .map((img) => img.src)
-        .filter(Boolean),
+        .filter(Boolean)
+        .filter(isAllowedResourceUrl),
     ),
   };
-  console.log(globalThis.__splitSource_docInfo)
+
   // Send it back to background
   chrome.runtime.sendMessage({
     type: "DOCUMENT_INFO",

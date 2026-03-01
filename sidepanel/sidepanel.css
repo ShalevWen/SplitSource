@@ -29,6 +29,43 @@ body {
   overflow: hidden;
 }
 
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+#fileBar {
+  flex: 0 0 auto;
+  padding: 0.5rem 1rem 0.35rem;
+  padding-right: 4.25rem;
+}
+
+#fileNameInput {
+  width: min(32rem, calc(100vw - 6rem));
+  max-width: 100%;
+  height: 32px;
+  padding: 0 0.6rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+  font:
+    0.8rem/1.2 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    "Liberation Mono",
+    "Courier New",
+    monospace;
+
+  &:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+}
+
 #root {
   margin: 0;
   padding: 0.75rem;
@@ -44,7 +81,8 @@ body {
   color: var(--text);
   white-space: pre;
   overflow: auto;
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   /* width: 100%; */
   scrollbar-width: thin;
   /* scrollbar-color: rgba(255, 255, 255, 0.22) transparent; */
@@ -88,6 +126,17 @@ body {
       &.isLoaded {
         opacity: 1;
       }
+    }
+  }
+
+  &.audioView {
+    white-space: normal;
+
+    audio {
+      display: block;
+      width: min(48rem, 100%);
+      max-width: 100%;
+      margin: 5rem auto;
     }
   }
 }
