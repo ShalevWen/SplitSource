@@ -328,15 +328,68 @@ import { highlightText } from "/speed-highlight/dist/index.js";
     }
   };
 
-  const displayNameFromUrl = (urlString) => {
+  const displayNameFromUrl = (urlString, indexHint) => {
     if (typeof urlString !== "string") return String(urlString);
+
+    const shortenMiddle = (s, maxLen = 56) => {
+      if (typeof s !== "string") return String(s);
+      if (s.length <= maxLen) return s;
+      const head = Math.max(18, Math.floor((maxLen - 1) * 0.6));
+      const tail = Math.max(10, maxLen - 1 - head);
+      return `${s.slice(0, head)}…${s.slice(-tail)}`;
+    };
+
+    if (urlString.startsWith("data:")) {
+      // Avoid showing the base64 payload in the menu.
+      // Example: data:image/png;base64,....
+      const mime = urlString.slice(5).split(/[;,]/, 1)[0] || "";
+      const n = Number.isFinite(indexHint) ? ` #${indexHint + 1}` : "";
+
+      if (mime.startsWith("image/")) {
+        const subtype = mime.slice("image/".length) || "image";
+        return `Inline image (${subtype})${n}`;
+      }
+
+      return `Inline data${mime ? ` (${mime})` : ""}${n}`;
+    }
+
+    if (urlString.startsWith("blob:")) {
+      const n = Number.isFinite(indexHint) ? ` #${indexHint + 1}` : "";
+      return `Blob URL${n}`;
+    }
+
     try {
       const url = new URL(urlString);
-      const lastSegment = url.pathname.split("/").filter(Boolean).at(-1);
-      return lastSegment ? decodeURIComponent(lastSegment) : url.hostname;
+
+      const segments = url.pathname.split("/").filter(Boolean);
+      const lastSegment = segments.at(-1) ?? "";
+
+      // Some CDNs / apps (notably Google) embed useful identifiers as
+      // `k=...` / `m=...` / `v=...` path segments, and can include gigantic
+      // segments that are unreadable in a menu.
+      const kSegment = segments.find((s) => s.startsWith("k="));
+      const mSegment = segments.find((s) => s.startsWith("m="));
+      const vSegment = segments.find((s) => s.startsWith("v="));
+
+      let candidate = kSegment ?? mSegment ?? vSegment ?? lastSegment;
+      candidate = candidate ? decodeURIComponent(candidate) : "";
+
+      if (!candidate) return url.hostname;
+
+      const xjs = url.searchParams.get("xjs");
+      const suffix = xjs ? ` (xjs=${shortenMiddle(xjs, 18)})` : "";
+
+      // If it's a normal-looking filename, keep it simple.
+      const looksLikeFilename =
+        candidate.length <= 60 && /\.[a-z0-9]{1,6}$/i.test(candidate);
+      if (looksLikeFilename) return candidate;
+
+      // If it's long / token-y, prefix hostname and shorten.
+      const label = `${url.hostname} ${shortenMiddle(candidate, 56)}`;
+      return `${label}${suffix}`;
     } catch {
       const last = urlString.split("/").filter(Boolean).at(-1);
-      return last ?? urlString;
+      return shortenMiddle(last ?? urlString, 56);
     }
   };
 
@@ -350,13 +403,10 @@ import { highlightText } from "/speed-highlight/dist/index.js";
     if (!Array.isArray(urls) || urls.length === 0) return 0;
 
     const fragment = document.createDocumentFragment();
-    const seen = new Set();
     let count = 0;
 
-    for (const url of urls) {
+    for (const [i, url] of urls.entries()) {
       if (typeof url !== "string" || url.length === 0) continue;
-      if (seen.has(url)) continue;
-      seen.add(url);
       count++;
 
       const item = document.createElement("button");
@@ -366,7 +416,7 @@ import { highlightText } from "/speed-highlight/dist/index.js";
       item.dataset.kind = kind;
       item.dataset.url = url;
       item.title = url;
-      item.textContent = displayNameFromUrl(url);
+      item.textContent = displayNameFromUrl(url, i);
       fragment.appendChild(item);
     }
 
