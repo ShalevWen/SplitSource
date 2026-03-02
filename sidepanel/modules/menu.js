@@ -235,7 +235,7 @@ export const createMenu = ({
       }
 
       const removeButton = e.target?.closest?.(
-        "button.submenuRemove[data-kind=\"extras\"][data-url]",
+        'button.submenuRemove[data-kind="extras"][data-url]',
       );
       if (removeButton) {
         e.preventDefault();

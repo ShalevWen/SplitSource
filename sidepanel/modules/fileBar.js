@@ -95,7 +95,7 @@ export const createFileBar = ({ fileBar, fileNameInput, state }) => {
       e.preventDefault();
 
       const ctx = state.fileSwapContext;
-      if (!ctx || !state.currentUrl) return;
+      if (!ctx) return;
 
       let nextName = fileNameInput.value.trim();
       if (!nextName) return;

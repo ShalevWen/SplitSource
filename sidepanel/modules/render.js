@@ -6,6 +6,43 @@ import {
 } from "./utils.js";
 
 export const createRenderer = ({ root, state, highlighter, setFileBar }) => {
+  // In-memory cache for fetched source so swapping back/forth is instant.
+  // Scoped to this sidepanel instance (per tab/page URL).
+  const SOURCE_CACHE_MAX_ENTRIES = 25;
+  const SOURCE_CACHE_MAX_CHARS = 1_000_000;
+  const sourceCache = new Map();
+
+  const sourceCacheGet = (url) => {
+    const hit = sourceCache.get(url);
+    if (!hit) return null;
+    sourceCache.delete(url);
+    sourceCache.set(url, hit);
+    return hit;
+  };
+
+  const sourceCacheSet = (url, value) => {
+    if (!url || !value) return;
+    if (typeof value.text === "string" && value.text.length > SOURCE_CACHE_MAX_CHARS)
+      return;
+
+    sourceCache.delete(url);
+    sourceCache.set(url, value);
+
+    while (sourceCache.size > SOURCE_CACHE_MAX_ENTRIES) {
+      const oldestKey = sourceCache.keys().next().value;
+      if (oldestKey == null) break;
+      sourceCache.delete(oldestKey);
+    }
+  };
+
+  const setFileBarForUrl = (urlString) => {
+    const ctx =
+      getFileSwapContext(urlString) ||
+      getPageSwapContext(urlString) ||
+      getPageSwapContext(state.pageUrl);
+    setFileBar(ctx);
+  };
+
   const resetRootForRender = (mode) => {
     highlighter.cancelPendingHighlight();
     highlighter.stripSpeedHighlightClasses();
@@ -21,12 +58,12 @@ export const createRenderer = ({ root, state, highlighter, setFileBar }) => {
 
     if (!url) {
       root.textContent = "No image URL.";
-      setFileBar(null);
+      setFileBarForUrl(state.pageUrl);
       return;
     }
 
     state.currentUrl = url;
-    setFileBar(getFileSwapContext(url));
+    setFileBarForUrl(url);
 
     const img = document.createElement("img");
     img.src = url;
@@ -38,7 +75,7 @@ export const createRenderer = ({ root, state, highlighter, setFileBar }) => {
       "error",
       () => {
         root.textContent = "Failed to load image.";
-        setFileBar(getFileSwapContext(url));
+        setFileBarForUrl(url);
       },
       { once: true },
     );
@@ -63,18 +100,18 @@ export const createRenderer = ({ root, state, highlighter, setFileBar }) => {
 
     if (!url) {
       root.textContent = "No audio URL.";
-      setFileBar(null);
+      setFileBarForUrl(state.pageUrl);
       return;
     }
 
     if (!isHttpUrl(url)) {
       root.textContent = `Unsupported URL: ${url}`;
-      setFileBar(null);
+      setFileBarForUrl(state.pageUrl);
       return;
     }
 
     state.currentUrl = url;
-    setFileBar(getFileSwapContext(url));
+    setFileBarForUrl(url);
 
     const elAudio = document.createElement("audio");
     elAudio.controls = true;
@@ -89,7 +126,7 @@ export const createRenderer = ({ root, state, highlighter, setFileBar }) => {
       "error",
       () => {
         root.textContent = "Failed to load audio.";
-        setFileBar(getFileSwapContext(url));
+        setFileBarForUrl(url);
       },
       { once: true },
     );
@@ -103,14 +140,44 @@ export const createRenderer = ({ root, state, highlighter, setFileBar }) => {
     if (!url) {
       resetRootForRender("source");
       root.textContent = "No active tab URL.";
+      setFileBarForUrl(state.pageUrl);
       return { ok: false, committed: true, status: null };
     }
 
     if (!isHttpUrl(url)) {
       resetRootForRender("source");
       root.textContent = `Unsupported URL: ${url}`;
-      setFileBar(null);
+      setFileBarForUrl(state.pageUrl);
       return { ok: false, committed: true, status: null };
+    }
+
+    // Cache hit: render immediately without refetching.
+    const cached = sourceCacheGet(url);
+    if (cached && typeof cached.text === "string") {
+      state.fetchController?.abort();
+      state.fetchController = null;
+
+      resetRootForRender("source");
+      state.currentUrl = url;
+      setFileBarForUrl(url);
+
+      root.textContent = cached.text;
+
+      const languageHint =
+        typeof opts?.languageHint === "string" ? opts.languageHint : null;
+      const lang =
+        languageHint ||
+        inferLanguageFromContentType(cached.contentType || "") ||
+        inferLanguageFromUrl(url) ||
+        null;
+
+      highlighter.scheduleHighlight(cached.text, lang);
+      return {
+        ok: true,
+        committed: true,
+        status: typeof cached.status === "number" ? cached.status : 200,
+        cached: true,
+      };
     }
 
     state.fetchController?.abort();
@@ -120,10 +187,7 @@ export const createRenderer = ({ root, state, highlighter, setFileBar }) => {
     const commitUi = () => {
       resetRootForRender("source");
       state.currentUrl = url;
-      const swapCtx =
-        getFileSwapContext(url) ||
-        (url === state.pageUrl ? getPageSwapContext(url) : null);
-      setFileBar(swapCtx);
+      setFileBarForUrl(url);
     };
 
     if (!preserveViewOn404) {
@@ -175,6 +239,12 @@ export const createRenderer = ({ root, state, highlighter, setFileBar }) => {
         null;
 
       highlighter.scheduleHighlight(text, lang);
+
+      sourceCacheSet(url, {
+        text,
+        contentType: contentType || "",
+        status: res.status,
+      });
       return { ok: true, committed: true, status: res.status };
     } catch (err) {
       if (controller.signal.aborted) {

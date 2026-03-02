@@ -9,6 +9,34 @@ import {
 } from "./utils.js";
 
 export const createNavigator = ({ state, render }) => {
+  // In-memory cache for HEAD probe results to speed up repeated swaps.
+  const HEAD_CACHE_MAX_ENTRIES = 50;
+  const HEAD_CACHE_TTL_MS = 60_000;
+  const headCache = new Map();
+
+  const headCacheGet = (url) => {
+    const hit = headCache.get(url);
+    if (!hit) return null;
+    if (Date.now() - (hit.ts || 0) > HEAD_CACHE_TTL_MS) {
+      headCache.delete(url);
+      return null;
+    }
+    headCache.delete(url);
+    headCache.set(url, hit);
+    return hit;
+  };
+
+  const headCacheSet = (url, value) => {
+    if (!url || !value) return;
+    headCache.delete(url);
+    headCache.set(url, { ...value, ts: Date.now() });
+    while (headCache.size > HEAD_CACHE_MAX_ENTRIES) {
+      const oldestKey = headCache.keys().next().value;
+      if (oldestKey == null) break;
+      headCache.delete(oldestKey);
+    }
+  };
+
   const downloadBlob = (blob, filename) => {
     const url = URL.createObjectURL(blob);
     try {
@@ -68,18 +96,34 @@ export const createNavigator = ({ state, render }) => {
     }
 
     let contentType = "";
-    try {
-      const head = await fetch(nextUrl.toString(), {
-        method: "HEAD",
-        credentials: "include",
-      });
-
-      if (head.status === 404) {
+    const cachedHead = headCacheGet(nextUrl.toString());
+    if (cachedHead) {
+      if (cachedHead.status === 404) {
         onNotFound?.(nextUrl.toString());
-        return { outcome: "notfound", status: 404 };
+        return { outcome: "notfound", status: 404, cached: true };
       }
+      contentType = cachedHead.contentType || "";
+    }
 
-      contentType = head.headers.get("content-type") || "";
+    try {
+      if (!cachedHead) {
+        const head = await fetch(nextUrl.toString(), {
+          method: "HEAD",
+          credentials: "include",
+        });
+
+        headCacheSet(nextUrl.toString(), {
+          status: head.status,
+          contentType: head.headers.get("content-type") || "",
+        });
+
+        if (head.status === 404) {
+          onNotFound?.(nextUrl.toString());
+          return { outcome: "notfound", status: 404 };
+        }
+
+        contentType = head.headers.get("content-type") || "";
+      }
     } catch {
       // ignore
     }
