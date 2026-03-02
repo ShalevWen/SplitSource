@@ -9,6 +9,18 @@ export const createMenu = ({
   inferLanguageFromUrl,
   extrasCache,
 }) => {
+  const normalizeUrl = (urlString) => {
+    if (typeof urlString !== "string" || urlString.length === 0) return null;
+    if (typeof state.pageUrl !== "string" || state.pageUrl.length === 0)
+      return urlString;
+
+    try {
+      return new URL(urlString, state.pageUrl).toString();
+    } catch {
+      return urlString;
+    }
+  };
+
   const isPageUrl = (url) =>
     typeof url === "string" &&
     typeof state.pageUrl === "string" &&
@@ -115,7 +127,10 @@ export const createMenu = ({
     }
 
     try {
-      const url = new URL(urlString);
+      const url =
+        typeof state.pageUrl === "string" && state.pageUrl.length > 0
+          ? new URL(urlString, state.pageUrl)
+          : new URL(urlString);
 
       if (state.pageUrl) {
         try {
@@ -291,6 +306,17 @@ export const createMenu = ({
         return;
       }
 
+      if (kind === "links" && typeof probeAndNavigate === "function") {
+        setActiveMenuEl(itemButton);
+        void probeAndNavigate(url, {
+          languageHint:
+            typeof inferLanguageFromUrl === "function"
+              ? inferLanguageFromUrl(url)
+              : null,
+        });
+        menu.setOpen(false);
+      }
+
       if (kind === "extras" && typeof probeAndNavigate === "function") {
         setActiveMenuEl(itemButton);
         void probeAndNavigate(url, {
@@ -318,11 +344,16 @@ export const createMenu = ({
 
   const populateFromDocInfo = (docInfo) => {
     state.docInfoReady = true;
-    state.knownResourceUrls = new Set([
-      ...(Array.isArray(docInfo?.scripts) ? docInfo.scripts : []),
-      ...(Array.isArray(docInfo?.styleSheets) ? docInfo.styleSheets : []),
-      ...(Array.isArray(docInfo?.images) ? docInfo.images : []),
-    ]);
+    state.knownResourceUrls = new Set(
+      [
+        ...(Array.isArray(docInfo?.scripts) ? docInfo.scripts : []),
+        ...(Array.isArray(docInfo?.styleSheets) ? docInfo.styleSheets : []),
+        ...(Array.isArray(docInfo?.images) ? docInfo.images : []),
+        ...(Array.isArray(docInfo?.links) ? docInfo.links : []),
+      ]
+        .map((u) => normalizeUrl(u))
+        .filter(Boolean),
+    );
 
     // If the user entered URLs before docInfo was ready, process them now.
     if (Array.isArray(state.pendingExtras) && state.pendingExtras.length > 0) {
@@ -331,7 +362,7 @@ export const createMenu = ({
       for (const url of pending) {
         if (typeof url !== "string" || url.length === 0) continue;
         if (isPageUrl(url)) continue;
-        if (state.knownResourceUrls?.has?.(url)) continue;
+        if (state.knownResourceUrls?.has?.(normalizeUrl(url) ?? url)) continue;
         if (!Array.isArray(state.extras)) state.extras = [];
         if (state.extras.includes(url)) continue;
         state.extras.push(url);
@@ -341,7 +372,9 @@ export const createMenu = ({
     // Remove anything that is now part of the known resource lists.
     if (Array.isArray(state.extras) && state.extras.length > 0) {
       const filtered = state.extras.filter(
-        (u) => !isPageUrl(u) && !state.knownResourceUrls?.has?.(u),
+        (u) =>
+          !isPageUrl(u) &&
+          !state.knownResourceUrls?.has?.(normalizeUrl(u) ?? u),
       );
       if (filtered.length !== state.extras.length) {
         state.extras = filtered;
@@ -355,11 +388,13 @@ export const createMenu = ({
       docInfo.styleSheets,
     );
     const imagesCount = populateSubmenu("images", docInfo.images);
+    const linksCount = populateSubmenu("links", docInfo.links);
     const extrasCount = populateSubmenu("extras", state.extras);
 
     setGroupVisible("scripts", scriptsCount > 0);
     setGroupVisible("stylesheets", stylesheetsCount > 0);
     setGroupVisible("images", imagesCount > 0);
+    setGroupVisible("links", linksCount > 0);
     setGroupVisible("extras", extrasCount > 0);
 
     menu.show();
@@ -375,7 +410,7 @@ export const createMenu = ({
       return;
     }
 
-    if (state.knownResourceUrls?.has?.(url)) return;
+    if (state.knownResourceUrls?.has?.(normalizeUrl(url) ?? url)) return;
     if (Array.isArray(state.extras) && state.extras.includes(url)) return;
 
     if (!Array.isArray(state.extras)) state.extras = [];

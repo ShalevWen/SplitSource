@@ -23,13 +23,28 @@
       />
     </form>
     <div id="modeBar" role="toolbar" aria-label="Render mode" hidden>
-      <button class="modeButton" type="button" data-mode="source" aria-pressed="false">
+      <button
+        class="modeButton"
+        type="button"
+        data-mode="source"
+        aria-pressed="false"
+      >
         Text
       </button>
-      <button class="modeButton" type="button" data-mode="image" aria-pressed="false">
+      <button
+        class="modeButton"
+        type="button"
+        data-mode="image"
+        aria-pressed="false"
+      >
         Image
       </button>
-      <button class="modeButton" type="button" data-mode="audio" aria-pressed="false">
+      <button
+        class="modeButton"
+        type="button"
+        data-mode="audio"
+        aria-pressed="false"
+      >
         Audio
       </button>
     </div>
@@ -105,6 +120,19 @@
             Images
           </button>
           <div class="submenu" id="menu-images" aria-hidden="true"></div>
+        </div>
+
+        <div class="menuGroup" data-group="links">
+          <button
+            class="menuItem menuToggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="menu-links"
+            data-toggle="links"
+          >
+            Links
+          </button>
+          <div class="submenu" id="menu-links" aria-hidden="true"></div>
         </div>
 
         <div class="menuGroup" data-group="extras" hidden>

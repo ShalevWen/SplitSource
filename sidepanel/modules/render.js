@@ -5,7 +5,13 @@ import {
   isHttpUrl,
 } from "./utils.js";
 
-export const createRenderer = ({ root, state, highlighter, setFileBar, onModeChange }) => {
+export const createRenderer = ({
+  root,
+  state,
+  highlighter,
+  setFileBar,
+  onModeChange,
+}) => {
   // In-memory cache for fetched source so swapping back/forth is instant.
   // Scoped to this sidepanel instance (per tab/page URL).
   const SOURCE_CACHE_MAX_ENTRIES = 25;

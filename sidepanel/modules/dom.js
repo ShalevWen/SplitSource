@@ -35,6 +35,13 @@ export const getDom = () => {
       ),
       submenu: document.getElementById("menu-images"),
     },
+    links: {
+      group: burgerMenu.querySelector('.menuGroup[data-group="links"]'),
+      toggle: burgerMenu.querySelector(
+        '.menuGroup[data-group="links"] button[data-toggle]',
+      ),
+      submenu: document.getElementById("menu-links"),
+    },
     extras: {
       group: burgerMenu.querySelector('.menuGroup[data-group="extras"]'),
       toggle: burgerMenu.querySelector(

@@ -73,19 +73,33 @@ export const createNavigator = ({ state, render }) => {
     }
   };
 
+  const resolveAgainstPageUrl = (urlString) => {
+    if (typeof urlString !== "string" || urlString.length === 0) return null;
+
+    if (isHttpUrl(urlString)) {
+      try {
+        return new URL(urlString);
+      } catch {
+        return null;
+      }
+    }
+
+    if (typeof state.pageUrl !== "string" || state.pageUrl.length === 0)
+      return null;
+
+    try {
+      return new URL(urlString, state.pageUrl);
+    } catch {
+      return null;
+    }
+  };
+
   const probeAndNavigate = async (nextUrlString, opts = {}) => {
     const onNotFound =
       typeof opts?.onNotFound === "function" ? opts.onNotFound : null;
 
-    if (!isHttpUrl(nextUrlString)) {
-      await render.source(nextUrlString, opts);
-      return { outcome: "source" };
-    }
-
-    let nextUrl;
-    try {
-      nextUrl = new URL(nextUrlString);
-    } catch {
+    const nextUrl = resolveAgainstPageUrl(nextUrlString);
+    if (!nextUrl || !isHttpUrl(nextUrl.toString())) {
       await render.source(nextUrlString, opts);
       return { outcome: "source" };
     }
@@ -96,10 +110,11 @@ export const createNavigator = ({ state, render }) => {
     }
 
     let contentType = "";
-    const cachedHead = headCacheGet(nextUrl.toString());
+    const nextUrlAbs = nextUrl.toString();
+    const cachedHead = headCacheGet(nextUrlAbs);
     if (cachedHead) {
       if (cachedHead.status === 404) {
-        onNotFound?.(nextUrl.toString());
+        onNotFound?.(nextUrlAbs);
         return { outcome: "notfound", status: 404, cached: true };
       }
       contentType = cachedHead.contentType || "";
@@ -107,18 +122,18 @@ export const createNavigator = ({ state, render }) => {
 
     try {
       if (!cachedHead) {
-        const head = await fetch(nextUrl.toString(), {
+        const head = await fetch(nextUrlAbs, {
           method: "HEAD",
           credentials: "include",
         });
 
-        headCacheSet(nextUrl.toString(), {
+        headCacheSet(nextUrlAbs, {
           status: head.status,
           contentType: head.headers.get("content-type") || "",
         });
 
         if (head.status === 404) {
-          onNotFound?.(nextUrl.toString());
+          onNotFound?.(nextUrlAbs);
           return { outcome: "notfound", status: 404 };
         }
 
@@ -131,52 +146,52 @@ export const createNavigator = ({ state, render }) => {
     const classified = classifyMimeType(contentType);
 
     if (classified.kind === "image") {
-      render.image(nextUrl.toString());
+      render.image(nextUrlAbs);
       return { outcome: "image" };
     }
 
     if (classified.kind === "audio") {
       if (!canPlayAudioMime(classified.mime)) {
-        const ok = await downloadUrl(nextUrl.toString());
+        const ok = await downloadUrl(nextUrlAbs);
         return { outcome: ok ? "download" : "error" };
       }
 
-      render.audio(nextUrl.toString(), classified.mime);
+      render.audio(nextUrlAbs, classified.mime);
       return { outcome: "audio" };
     }
 
     if (classified.kind === "unknown") {
-      const inferredAudioMime = inferAudioMimeFromUrl(nextUrl.toString());
+      const inferredAudioMime = inferAudioMimeFromUrl(nextUrlAbs);
       if (inferredAudioMime) {
         if (!canPlayAudioMime(inferredAudioMime)) {
-          const ok = await downloadUrl(nextUrl.toString());
+          const ok = await downloadUrl(nextUrlAbs);
           return { outcome: ok ? "download" : "error" };
         }
 
-        render.audio(nextUrl.toString(), inferredAudioMime);
+        render.audio(nextUrlAbs, inferredAudioMime);
         return { outcome: "audio" };
       }
     }
 
     if (classified.kind === "download") {
-      const inferredAudioMime = inferAudioMimeFromUrl(nextUrl.toString());
+      const inferredAudioMime = inferAudioMimeFromUrl(nextUrlAbs);
       if (inferredAudioMime && canPlayAudioMime(inferredAudioMime)) {
-        render.audio(nextUrl.toString(), inferredAudioMime);
+        render.audio(nextUrlAbs, inferredAudioMime);
         return { outcome: "audio" };
       }
     }
 
     if (classified.kind === "text" || classified.kind === "unknown") {
-      const result = await render.source(nextUrl.toString(), {
+      const result = await render.source(nextUrlAbs, {
         ...opts,
         languageHint:
           opts?.languageHint ||
           inferLanguageFromContentType(contentType) ||
-          inferLanguageFromUrl(nextUrl.toString()),
+          inferLanguageFromUrl(nextUrlAbs),
       });
 
       if (result?.status === 404 && result?.committed === false) {
-        onNotFound?.(nextUrl.toString());
+        onNotFound?.(nextUrlAbs);
         return { outcome: "notfound", status: 404 };
       }
 
@@ -187,7 +202,7 @@ export const createNavigator = ({ state, render }) => {
       };
     }
 
-    const ok = await downloadUrl(nextUrl.toString());
+    const ok = await downloadUrl(nextUrlAbs);
     return { outcome: ok ? "download" : "error" };
   };
 

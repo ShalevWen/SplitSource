@@ -58,6 +58,12 @@
         .filter(Boolean)
         .filter(isAllowedResourceUrl),
     ),
+    links: uniqueStrings(
+      Array.from(document.links)
+        .map((a) => a.getAttribute("href") || a.href)
+        .filter(Boolean)
+        .filter(isAllowedResourceUrl),
+    ),
   };
 
   // Send it back to background
