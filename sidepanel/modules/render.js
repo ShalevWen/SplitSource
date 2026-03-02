@@ -22,7 +22,10 @@ export const createRenderer = ({ root, state, highlighter, setFileBar }) => {
 
   const sourceCacheSet = (url, value) => {
     if (!url || !value) return;
-    if (typeof value.text === "string" && value.text.length > SOURCE_CACHE_MAX_CHARS)
+    if (
+      typeof value.text === "string" &&
+      value.text.length > SOURCE_CACHE_MAX_CHARS
+    )
       return;
 
     sourceCache.delete(url);

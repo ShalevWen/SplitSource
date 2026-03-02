@@ -9,6 +9,12 @@ export const createMenu = ({
   inferLanguageFromUrl,
   extrasCache,
 }) => {
+  const isPageUrl = (url) =>
+    typeof url === "string" &&
+    typeof state.pageUrl === "string" &&
+    url.length > 0 &&
+    url === state.pageUrl;
+
   const setActiveMenuEl = (el) => {
     for (const prev of burgerMenu.querySelectorAll(".isActive")) {
       prev.classList.remove("isActive");
@@ -324,6 +330,7 @@ export const createMenu = ({
       state.pendingExtras = [];
       for (const url of pending) {
         if (typeof url !== "string" || url.length === 0) continue;
+        if (isPageUrl(url)) continue;
         if (state.knownResourceUrls?.has?.(url)) continue;
         if (!Array.isArray(state.extras)) state.extras = [];
         if (state.extras.includes(url)) continue;
@@ -334,7 +341,7 @@ export const createMenu = ({
     // Remove anything that is now part of the known resource lists.
     if (Array.isArray(state.extras) && state.extras.length > 0) {
       const filtered = state.extras.filter(
-        (u) => !state.knownResourceUrls?.has?.(u),
+        (u) => !isPageUrl(u) && !state.knownResourceUrls?.has?.(u),
       );
       if (filtered.length !== state.extras.length) {
         state.extras = filtered;
@@ -360,6 +367,7 @@ export const createMenu = ({
 
   const maybeAddExtraUrl = (url) => {
     if (typeof url !== "string" || url.length === 0) return;
+    if (isPageUrl(url)) return;
 
     if (!state.docInfoReady) {
       if (!Array.isArray(state.pendingExtras)) state.pendingExtras = [];

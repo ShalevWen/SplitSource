@@ -79,6 +79,14 @@ import { inferLanguageFromUrl } from "./modules/utils.js";
 
     // Load cached Extras for the exact page URL (per-page isolation).
     state.extras = await extrasCache.loadForPageUrl(state.pageUrl);
+    if (
+      typeof state.pageUrl === "string" &&
+      Array.isArray(state.extras) &&
+      state.extras.includes(state.pageUrl)
+    ) {
+      state.extras = state.extras.filter((u) => u !== state.pageUrl);
+      void extrasCache.saveForPageUrl(state.pageUrl, state.extras);
+    }
 
     chrome.tabs.onUpdated.addListener((updatedTabId, changeInfo) => {
       if (updatedTabId === state.tab?.id && changeInfo.url) {
