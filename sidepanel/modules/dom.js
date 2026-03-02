@@ -8,6 +8,7 @@ export const getDom = () => {
   const root = mustGet("root");
   const fileBar = document.getElementById("fileBar");
   const fileNameInput = document.getElementById("fileNameInput");
+  const modeBar = document.getElementById("modeBar");
   const menuContainer = mustGet("menuContainer");
   const burgerButton = mustGet("burger");
   const burgerMenu = mustGet("burgerMenu");
@@ -47,6 +48,7 @@ export const getDom = () => {
     root,
     fileBar,
     fileNameInput,
+    modeBar,
     menuContainer,
     burgerButton,
     burgerMenu,

@@ -3,6 +3,7 @@ import { createExtrasCache } from "./modules/extrasCache.js";
 import { createFileBar } from "./modules/fileBar.js";
 import { createHighlighter } from "./modules/highlight.js";
 import { createMenu } from "./modules/menu.js";
+import { createModeBar } from "./modules/modeBar.js";
 import { createNavigator } from "./modules/navigation.js";
 import { createRenderer } from "./modules/render.js";
 import { createState } from "./modules/state.js";
@@ -29,12 +30,23 @@ import { inferLanguageFromUrl } from "./modules/utils.js";
     state,
   });
 
+  let modeBar;
+
   const render = createRenderer({
     root: dom.root,
     state,
     highlighter,
     setFileBar: fileBar.setFileBar,
+    onModeChange: (mode) => modeBar?.setActiveMode?.(mode),
   });
+
+  modeBar = createModeBar({
+    modeBar: dom.modeBar,
+    state,
+    render,
+  });
+
+  modeBar.init();
 
   const navigator = createNavigator({ state, render });
 

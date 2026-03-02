@@ -40,6 +40,47 @@ body {
   padding-right: 4.25rem;
 }
 
+#modeBar {
+  flex: 0 0 auto;
+  padding: 0 1rem 0.5rem;
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.modeButton {
+  height: 28px;
+  padding: 0 0.6rem;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  outline: 1px solid var(--border);
+  transition:
+    background-color 180ms ease,
+    transform 120ms ease;
+
+  &:hover {
+    background: var(--hover);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  &:active {
+    transform: translateY(1px);
+    background: var(--press);
+  }
+
+  &.isActive {
+    background: var(--active);
+    outline: 1px solid var(--active-border);
+  }
+}
+
 #fileNameInput {
   width: min(32rem, calc(100vw - 6rem));
   max-width: 100%;
@@ -414,6 +455,7 @@ body {
   #burger,
   #burgerMenu,
   .menuItem,
+  .modeButton,
   .submenu,
   .submenuItem,
   .submenuRemove,
