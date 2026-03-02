@@ -62,7 +62,6 @@
       Array.from(document.links)
         .map((a) => a.getAttribute("href") || a.href)
         .filter(Boolean)
-        .filter(isAllowedResourceUrl),
     ),
   };
 
